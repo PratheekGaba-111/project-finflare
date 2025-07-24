@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: finflare-mysql
+    environment:
+      MYSQL_DATABASE: finflare
+      MYSQL_USER: finflare_user
+      MYSQL_PASSWORD: finflare_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - finflare-network
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: finflare-backend
+    depends_on:
+      - mysql
+      - ml-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/finflare?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: finflare_user
+      SPRING_DATASOURCE_PASSWORD: finflare_password
+      APP_ML_SERVICE_URL: http://ml-service:5000
+    ports:
+      - "8080:8080"
+    networks:
+      - finflare-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: finflare-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    networks:
+      - finflare-network
+
+  # ML Service
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: finflare-ml
+    ports:
+      - "5000:5000"
+    networks:
+      - finflare-network
+
+volumes:
+  mysql_data:
+
+networks:
+  finflare-network:
+    driver: bridge
