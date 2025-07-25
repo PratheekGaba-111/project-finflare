@@ -193,4 +193,40 @@ public class ExpenseService {
                 .multiply(BigDecimal.valueOf(100))
                 .doubleValue();
     }
+
+    public List<Map<String, Object>> getRecentExpensesForAnalysis(Long userId, int days) {
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.minusDays(days);
+        
+        List<Expense> expenses = expenseRepository.findByUserIdAndExpenseDateBetween(userId, startDate, endDate);
+        
+        return expenses.stream()
+                .map(expense -> {
+                    Map<String, Object> expenseData = new HashMap<>();
+                    expenseData.put("description", expense.getDescription());
+                    expenseData.put("amount", expense.getAmount());
+                    expenseData.put("category", expense.getCategory().getDisplayName());
+                    expenseData.put("date", expense.getExpenseDate());
+                    return expenseData;
+                })
+                .collect(ArrayList::new, (list, item) -> list.add(item), ArrayList::addAll);
+    }
+
+    public Map<String, Double> getCategorySpendingForCurrentMonth(Long userId) {
+        LocalDate startOfMonth = LocalDate.now().withDayOfMonth(1);
+        LocalDate endOfMonth = LocalDate.now();
+
+        List<Expense> expenses = expenseRepository.findByUserIdAndExpenseDateBetween(userId, startOfMonth, endOfMonth);
+        
+        return expenses.stream()
+                .collect(HashMap::new,
+                    (map, expense) -> map.merge(
+                        expense.getCategory().getDisplayName(), 
+                        expense.getAmount().doubleValue(), 
+                        Double::sum),
+                    (map1, map2) -> {
+                        map2.forEach((key, value) -> map1.merge(key, value, Double::sum));
+                        return map1;
+                    });
+    }
 }
